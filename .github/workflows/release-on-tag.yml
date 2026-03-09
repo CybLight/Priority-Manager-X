@@ -3,7 +3,7 @@ name: Build And Release Installer
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "8.0.x"
+          dotnet-version: '8.0.x'
 
       - name: Install Inno Setup
         shell: powershell
@@ -36,7 +36,8 @@ jobs:
           if (-not [string]::IsNullOrWhiteSpace($env:SPARSE_PFX_BASE64) -and -not [string]::IsNullOrWhiteSpace($env:SPARSE_PFX_PASSWORD)) {
             $pfxPath = Join-Path $env:RUNNER_TEMP "pmx-release.pfx"
             [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:SPARSE_PFX_BASE64))
-            ./installer/build-installer.ps1 -Runtimes win-x64,win-x86 -BuildSparsePackage:$true -SparsePfxPath $pfxPath -SparsePfxPassword $env:SPARSE_PFX_PASSWORD
+            $secPass = ConvertTo-SecureString $env:SPARSE_PFX_PASSWORD -AsPlainText -Force
+            ./installer/build-installer.ps1 -Runtimes win-x64,win-x86 -BuildSparsePackage:$true -SparsePfxPath $pfxPath -SparsePfxPassword $secPass
           } else {
             ./installer/build-installer.ps1 -Runtimes win-x64,win-x86 -BuildSparsePackage:$false
           }
