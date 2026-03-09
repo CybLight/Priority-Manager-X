@@ -1,5 +1,6 @@
 param(
     [string]$Configuration = "Release",
+    [string]$Runtime = "win-x64",
     [string]$OutputMsix = "PriorityManagerX.Sparse.msix",
     # Каталог установки Win32‑приложения (куда Inno ставит PMX)
     [string]$ExternalInstallDir = "C:\Program Files\Priority Manager X",
@@ -140,12 +141,21 @@ $assetsTargetDir = Join-Path $sparseDir "Assets"
 New-Item -ItemType Directory -Path $assetsTargetDir -Force | Out-Null
 Copy-Item (Join-Path $assetsSourceDir "PmX.png") (Join-Path $assetsTargetDir "PmX.png") -Force
 
-# Копируем COM‑host и exe в пакет (относительные пути должны совпасть с manifest)
+# Копируем COM-host и exe в пакет (относительные пути должны совпасть с manifest)
+$publishDir = Join-Path $root "bin\$Configuration\net8.0-windows\$Runtime\publish"
 $binDir = Join-Path $root "bin\$Configuration\net8.0-windows"
 $shellDir = Join-Path $root "ShellExtension\bin\$Configuration\net8.0-windows"
 
+$pmxExePath = Join-Path $publishDir "PriorityManagerX.exe"
+if (-not (Test-Path $pmxExePath)) {
+    $pmxExePath = Join-Path $binDir "PriorityManagerX.exe"
+}
+if (-not (Test-Path $pmxExePath)) {
+    throw "PriorityManagerX.exe not found. Checked: '$publishDir' and '$binDir'."
+}
+
 New-Item -ItemType Directory -Path (Join-Path $sparseDir "PriorityManagerX") -Force | Out-Null
-Copy-Item (Join-Path $binDir "PriorityManagerX.exe") (Join-Path $sparseDir "PriorityManagerX\") -Force
+Copy-Item $pmxExePath (Join-Path $sparseDir "PriorityManagerX\") -Force
 
 Copy-Item (Join-Path $shellDir "PriorityManagerX.ShellExtension.comhost.dll") (Join-Path $sparseDir "PriorityManagerX.ShellExtension.comhost.dll") -Force
 Copy-Item (Join-Path $shellDir "PriorityManagerX.ShellExtension.dll") (Join-Path $sparseDir "PriorityManagerX.ShellExtension.dll") -Force

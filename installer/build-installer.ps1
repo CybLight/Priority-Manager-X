@@ -132,6 +132,7 @@ foreach ($runtime in $Runtimes) {
             "-ExecutionPolicy", "Bypass",
             "-File", $sparseBuildScript,
             "-Configuration", $Configuration,
+            "-Runtime", $runtime,
             "-OutputMsix", "PriorityManagerX.Sparse.msix"
         )
 
