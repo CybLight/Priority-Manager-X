@@ -8,7 +8,7 @@ param(
     [string]$MakeAppxPath = "",
     # Путь к pfx‑сертификату и его пароль (для подписи пакета).
     [string]$PfxPath = "",
-    [SecureString]$PfxPassword,
+    [string]$PfxPassword = "",
     # Авто‑инкремент версии в Package.appxmanifest перед сборкой.
     [bool]$AutoIncrementVersion = $true
 )
@@ -197,15 +197,14 @@ if ($makeExitCode -ne 0) {
 
 if ($PfxPath -and (Test-Path $PfxPath)) {
     try {
-        $null = Get-PfxData -FilePath $PfxPath -Password $PfxPassword
+        $secPfxPassword = ConvertTo-SecureString $PfxPassword -AsPlainText -Force
+        $null = Get-PfxData -FilePath $PfxPath -Password $secPfxPassword
     } catch {
         throw "PFX validation failed. Check PFX path and password."
     }
 
     $signtool = Resolve-SignTool
-    $plainPfxPassword = Convert-SecureStringToPlainText -Value $PfxPassword
-    & $signtool sign /f $PfxPath /p $plainPfxPassword /fd SHA256 /a (Join-Path $root $OutputMsix)
-    $plainPfxPassword = $null
+    & $signtool sign /f $PfxPath /p $PfxPassword /fd SHA256 /a (Join-Path $root $OutputMsix)
     $signExitCode = $LASTEXITCODE
     if ($signExitCode -ne 0) {
         throw "SignTool failed with exit code $signExitCode. Check PFX password and Publisher match."
