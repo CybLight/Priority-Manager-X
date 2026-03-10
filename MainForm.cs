@@ -880,12 +880,68 @@ namespace PriorityManagerX
         {
             try
             {
-                Cursor = Cursors.WaitCursor;
                 var tempDir = Path.Combine(Path.GetTempPath(), "PriorityManagerX", "updates");
                 var targetPath = Path.Combine(tempDir, installerAsset.Name);
 
-                MessageBox.Show(L10n.MsgUpdateDownloadStarted(installerAsset.Name), L10n.AppTitle);
-                await GitHubUpdater.DownloadAssetAsync(installerAsset.DownloadUrl, targetPath);
+                using var progressForm = new Form
+                {
+                    Text = L10n.AppTitle,
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedDialog,
+                    MaximizeBox = false,
+                    MinimizeBox = false,
+                    ShowInTaskbar = false,
+                    Width = 400,
+                    Height = 130
+                };
+
+                var progressLabel = new Label
+                {
+                    Text = L10n.MsgUpdateDownloadProgress(installerAsset.Name, 0),
+                    AutoSize = false,
+                    Dock = DockStyle.Top,
+                    Height = 30,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Padding = new Padding(8, 4, 8, 0)
+                };
+
+                var progressBar = new ProgressBar
+                {
+                    Minimum = 0,
+                    Maximum = 100,
+                    Value = 0,
+                    Dock = DockStyle.Top,
+                    Height = 28,
+                    Style = ProgressBarStyle.Continuous
+                };
+
+                progressForm.Controls.Add(progressBar);
+                progressForm.Controls.Add(progressLabel);
+                progressForm.Shown += async (_, _) =>
+                {
+                    try
+                    {
+                        var progress = new Progress<int>(percent =>
+                        {
+                            progressBar.Value = Math.Clamp(percent, 0, 100);
+                            progressLabel.Text = L10n.MsgUpdateDownloadProgress(installerAsset.Name, percent);
+                        });
+
+                        await GitHubUpdater.DownloadAssetAsync(installerAsset.DownloadUrl, targetPath, progress);
+
+                        progressForm.DialogResult = DialogResult.OK;
+                        progressForm.Close();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show(progressForm, L10n.MsgUpdateDownloadFailed(ex.Message), L10n.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        progressForm.DialogResult = DialogResult.Cancel;
+                        progressForm.Close();
+                    }
+                };
+
+                if (progressForm.ShowDialog(this) != DialogResult.OK)
+                    return;
 
                 Process.Start(new ProcessStartInfo(targetPath)
                 {
@@ -897,10 +953,6 @@ namespace PriorityManagerX
             catch (Exception ex)
             {
                 MessageBox.Show(L10n.MsgUpdateDownloadFailed(ex.Message), L10n.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                Cursor = Cursors.Default;
             }
         }
 
@@ -1414,10 +1466,14 @@ namespace PriorityManagerX
             var heatScore = GetHeatScore(grid, row);
             var heatColor = ApplyHeatTint(baseColor, heatScore);
             style.BackColor = row.IsGroup ? DarkenColor(heatColor, 0.90f) : heatColor;
-            style.ForeColor = System.Drawing.Color.Black;
+
+            var dark = ResolveIsDarkTheme();
+            style.ForeColor = dark ? System.Drawing.Color.FromArgb(220, 220, 220) : System.Drawing.Color.Black;
+
+            var accentColor = ParseHexColor(settings.AccentColor, System.Drawing.Color.FromArgb(48, 120, 210));
             style.SelectionBackColor = row.IsGroup
-                ? System.Drawing.Color.FromArgb(0, 120, 215)
-                : System.Drawing.Color.FromArgb(25, 118, 210);
+                ? DarkenColor(accentColor, 0.85f)
+                : accentColor;
             style.SelectionForeColor = System.Drawing.Color.White;
         }
 
@@ -2241,14 +2297,72 @@ namespace PriorityManagerX
             }
         }
 
-        static System.Drawing.Color ResolveGroupColor(string groupKey, string fallbackKey)
+        System.Drawing.Color ResolveGroupColor(string groupKey, string fallbackKey)
         {
             var key = string.IsNullOrWhiteSpace(groupKey) ? fallbackKey : groupKey;
             if (string.IsNullOrWhiteSpace(key))
-                return System.Drawing.Color.White;
+                return ResolveIsDarkTheme() ? System.Drawing.Color.FromArgb(50, 50, 50) : System.Drawing.Color.White;
 
-            var index = Math.Abs(StringComparer.OrdinalIgnoreCase.GetHashCode(key)) % GroupRowPalette.Length;
-            return GroupRowPalette[index];
+            var userGridAccent = ParseHexColor(settings.GridAccentColor, System.Drawing.Color.FromArgb(224, 246, 255));
+            var palette = GenerateGroupPalette(userGridAccent);
+            var index = Math.Abs(StringComparer.OrdinalIgnoreCase.GetHashCode(key)) % palette.Length;
+            return palette[index];
+        }
+
+        static System.Drawing.Color[] GenerateGroupPalette(System.Drawing.Color baseColor)
+        {
+            float h, s, l;
+            RgbToHsl(baseColor.R, baseColor.G, baseColor.B, out h, out s, out l);
+            var offsets = new[] { 0f, 0.11f, 0.22f, 0.42f, 0.58f, 0.75f };
+            var result = new System.Drawing.Color[offsets.Length];
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                var hue = (h + offsets[i]) % 1f;
+                HslToRgb(hue, Math.Clamp(s, 0.20f, 0.55f), Math.Clamp(l, 0.85f, 0.96f), out var r, out var g, out var b);
+                result[i] = System.Drawing.Color.FromArgb(r, g, b);
+            }
+            return result;
+        }
+
+        static void RgbToHsl(int r, int g, int b, out float h, out float s, out float l)
+        {
+            float rf = r / 255f, gf = g / 255f, bf = b / 255f;
+            float max = Math.Max(rf, Math.Max(gf, bf));
+            float min = Math.Min(rf, Math.Min(gf, bf));
+            l = (max + min) / 2f;
+            if (Math.Abs(max - min) < 0.001f) { h = s = 0; return; }
+            float d = max - min;
+            s = l > 0.5f ? d / (2f - max - min) : d / (max + min);
+            if (Math.Abs(max - rf) < 0.001f) h = ((gf - bf) / d + (gf < bf ? 6 : 0)) / 6f;
+            else if (Math.Abs(max - gf) < 0.001f) h = ((bf - rf) / d + 2) / 6f;
+            else h = ((rf - gf) / d + 4) / 6f;
+        }
+
+        static void HslToRgb(float h, float s, float l, out int r, out int g, out int b)
+        {
+            if (Math.Abs(s) < 0.001f) { r = g = b = (int)(l * 255); return; }
+            float q = l < 0.5f ? l * (1 + s) : l + s - l * s;
+            float p = 2 * l - q;
+            r = Math.Clamp((int)(HueToRgb(p, q, h + 1f / 3f) * 255), 0, 255);
+            g = Math.Clamp((int)(HueToRgb(p, q, h) * 255), 0, 255);
+            b = Math.Clamp((int)(HueToRgb(p, q, h - 1f / 3f) * 255), 0, 255);
+        }
+
+        static float HueToRgb(float p, float q, float t)
+        {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1f / 6f) return p + (q - p) * 6f * t;
+            if (t < 1f / 2f) return q;
+            if (t < 2f / 3f) return p + (q - p) * (2f / 3f - t) * 6f;
+            return p;
+        }
+
+        static System.Drawing.Color ParseHexColor(string hex, System.Drawing.Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex)) return fallback;
+            try { return ColorTranslator.FromHtml(hex); }
+            catch { return fallback; }
         }
 
         static System.Drawing.Color DarkenColor(System.Drawing.Color color, float factor)
@@ -3063,6 +3177,77 @@ namespace PriorityManagerX
                 processTimer.Start();
             else
                 processTimer.Stop();
+
+            ApplyTheme();
+        }
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+
+        bool ResolveIsDarkTheme()
+        {
+            if (settings.Theme == AppTheme.Dark) return true;
+            if (settings.Theme == AppTheme.Light) return false;
+
+            try
+            {
+                using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+                if (key?.GetValue("AppsUseLightTheme") is int val)
+                    return val == 0;
+            }
+            catch { }
+            return false;
+        }
+
+        void ApplyTheme()
+        {
+            var dark = ResolveIsDarkTheme();
+
+            var formBack = dark ? System.Drawing.Color.FromArgb(30, 30, 30) : SystemColors.Control;
+            var formFore = dark ? System.Drawing.Color.FromArgb(230, 230, 230) : SystemColors.ControlText;
+            var panelBack = dark ? System.Drawing.Color.FromArgb(40, 40, 40) : SystemColors.Control;
+            var gridBack = dark ? System.Drawing.Color.FromArgb(45, 45, 45) : System.Drawing.Color.White;
+            var gridFore = dark ? System.Drawing.Color.FromArgb(220, 220, 220) : System.Drawing.Color.Black;
+            var gridHeaderBack = dark ? System.Drawing.Color.FromArgb(55, 55, 55) : SystemColors.Control;
+            var gridHeaderFore = dark ? System.Drawing.Color.FromArgb(210, 210, 210) : SystemColors.ControlText;
+            var tabBack = dark ? System.Drawing.Color.FromArgb(38, 38, 38) : SystemColors.Control;
+
+            BackColor = formBack;
+            ForeColor = formFore;
+            topPanel.BackColor = panelBack;
+            topPanel.ForeColor = formFore;
+            tabs.BackColor = tabBack;
+
+            foreach (TabPage tp in tabs.TabPages)
+            {
+                tp.BackColor = formBack;
+                tp.ForeColor = formFore;
+            }
+
+            var grids = new[] { runningAppsGrid, allAppsGrid, backgroundGrid, windowsGrid };
+            foreach (var g in grids)
+            {
+                g.BackgroundColor = gridBack;
+                g.DefaultCellStyle.BackColor = gridBack;
+                g.DefaultCellStyle.ForeColor = gridFore;
+                g.ColumnHeadersDefaultCellStyle.BackColor = gridHeaderBack;
+                g.ColumnHeadersDefaultCellStyle.ForeColor = gridHeaderFore;
+                g.EnableHeadersVisualStyles = false;
+                g.GridColor = dark ? System.Drawing.Color.FromArgb(60, 60, 60) : SystemColors.ControlDark;
+            }
+
+            // Apply dark title bar via DWM
+            try
+            {
+                int useDark = dark ? 1 : 0;
+                DwmSetWindowAttribute(Handle, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
+            }
+            catch { }
+
+            Invalidate(true);
         }
 
         void ApplyLocalization()

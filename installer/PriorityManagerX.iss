@@ -2,7 +2,9 @@
 
 #define MyAppName "Priority Manager X"
 #define MyAppExeName "PriorityManagerX.exe"
-#define MyAppVersion "1.0.0"
+#ifndef MyAppVersion
+	#define MyAppVersion "1.0.0"
+#endif
 #define MyAppPublisher "Priority Manager X"
 #define MyAppURL "https://example.local/priority-manager-x"
 #ifndef AppArch

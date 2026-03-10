@@ -51,6 +51,13 @@ namespace PriorityManagerX
         Week2
     }
 
+    public enum AppTheme
+    {
+        Light,
+        Dark,
+        System
+    }
+
     public sealed class AppSettings
     {
         public string Language { get; set; } = "";
@@ -72,6 +79,9 @@ namespace PriorityManagerX
         public bool IncludePrereleaseUpdates { get; set; } = false;
         public UpdateCheckPeriod UpdatePeriod { get; set; } = UpdateCheckPeriod.Day1;
         public DateTime LastUpdateCheckUtc { get; set; } = DateTime.MinValue;
+        public AppTheme Theme { get; set; } = AppTheme.Light;
+        public string AccentColor { get; set; } = "#3078D2";
+        public string GridAccentColor { get; set; } = "#E0F6FF";
     }
 
     public static class AppSettingsStore
@@ -299,6 +309,15 @@ namespace PriorityManagerX
         public static string LanguageUk => Text("Украинский", "Українська", "Ukrainian");
         public static string LanguageEn => Text("Английский", "Англійська", "English");
 
+        public static string ThemeLabel => Text("Тема:", "Тема:", "Theme:");
+        public static string ThemeLight => Text("Светлая", "Світла", "Light");
+        public static string ThemeDark => Text("Тёмная", "Темна", "Dark");
+        public static string ThemeSystem => Text("Системная", "Системна", "System");
+        public static string AccentColorLabel => Text("Акцентный цвет:", "Акцентний колір:", "Accent color:");
+        public static string GridAccentColorLabel => Text("Цвет строк таблицы:", "Колір рядків таблиці:", "Grid row color:");
+        public static string ChooseColorBtn => Text("Выбрать...", "Обрати...", "Choose...");
+        public static string ThemeGroup => Text("Оформление", "Оформлення", "Appearance");
+
         public static string ProcessesTab => Text("Процессы", "Процеси", "Processes");
         public static string RulesTab => Text("Правила", "Правила", "Rules");
 
@@ -454,6 +473,8 @@ namespace PriorityManagerX
             => Text("В релизе не найден файл установщика (.exe).", "У релізі не знайдено файл інсталятора (.exe).", "No installer file (.exe) was found in the release.");
         public static string MsgUpdateDownloadStarted(string fileName)
             => Text($"Загрузка обновления: {fileName}", $"Завантаження оновлення: {fileName}", $"Downloading update: {fileName}");
+        public static string MsgUpdateDownloadProgress(string fileName, int percent)
+            => Text($"Загрузка: {fileName} — {percent}%", $"Завантаження: {fileName} — {percent}%", $"Downloading: {fileName} — {percent}%");
         public static string MsgUpdateDownloadFailed(string error)
             => Text($"Не удалось скачать обновление. {error}", $"Не вдалося завантажити оновлення. {error}", $"Failed to download update. {error}");
         public static string MsgNoUpdatesFound => Text("Новых обновлений не найдено.", "Нових оновлень не знайдено.", "No updates found.");
@@ -502,7 +523,7 @@ namespace PriorityManagerX
         public static string SettingsConfirmApply => Text("Подтверждать 'Применить сейчас'", "Підтверджувати 'Застосувати зараз'", "Confirm 'Apply now'");
         public static string SettingsAutoRefresh => Text("Автообновлять список процессов", "Автооновлювати список процесів", "Auto-refresh process list");
         public static string SettingsRefreshSeconds => Text("Интервал обновления (сек):", "Інтервал оновлення (сек):", "Refresh interval (sec):");
-        public static string SettingsInstallMenuHint => Text("Контекстное меню для .exe в Проводнике:", "Контекстне меню для .exe у Провіднику:", "Explorer context menu for .exe:");
+        public static string SettingsInstallMenuHint => Text("Контекстное меню в Проводнике", "Контекстне меню у Провіднику", "Context menu in Explorer");
         public static string SettingsAutoStartTask => Text("Запускать PMX в фоне при входе в систему (задача планировщика)", "Запускати PMX у фоні при вході в систему (завдання планувальника)", "Run PMX in background at sign-in (scheduled task)");
         public static string SettingsRunAsAdmin => Text("Запускать PMX от имени администратора", "Запускати PMX від імені адміністратора", "Run PMX as administrator");
         public static string SettingsStartupGuiGroup => Text("Запуск консоли управления (GUI)", "Запуск консолі керування (GUI)", "Management console startup (GUI)");

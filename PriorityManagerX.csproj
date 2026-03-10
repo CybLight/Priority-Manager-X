@@ -14,6 +14,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
+    <Version>1.0.3</Version>
     <Company>CybLight</Company>
     <Product>Priority Manager X</Product>
     <AssemblyTitle>Priority Manager X</AssemblyTitle>
@@ -31,7 +32,7 @@
   </ItemGroup>
 
   <Target Name="BuildShellExtension" AfterTargets="Build">
-    <MSBuild Projects="ShellExtension\PriorityManagerX.ShellExtension.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration)" />
+    <MSBuild Projects="ShellExtension\PriorityManagerX.ShellExtension.csproj" Targets="Restore;Build" Properties="Configuration=$(Configuration);RuntimeIdentifier=;SelfContained=false" />
 
     <ItemGroup>
       <ShellExtensionArtifacts Include="ShellExtension\bin\$(Configuration)\net8.0-windows\PriorityManagerX.ShellExtension.dll" />

@@ -184,9 +184,18 @@ foreach ($runtime in $Runtimes) {
     }
 
     Write-Host "[6/6][$runtime] Build installer..."
+    $appExeForVersion = Join-Path $stagingDir "PriorityManagerX.exe"
+    $appVersion = "1.0.0"
+    if (Test-Path $appExeForVersion) {
+        $vi = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($appExeForVersion)
+        if ($vi.ProductVersion) {
+            $appVersion = ($vi.ProductVersion -replace '[^0-9.].*$', '').TrimEnd('.')
+        }
+    }
+    Write-Host "Installer version: $appVersion"
     Push-Location $scriptDir
     try {
-        & $isccPath "/DAppArch=$appArch" $issFile
+        & $isccPath "/DAppArch=$appArch" "/DMyAppVersion=$appVersion" $issFile
         if ($LASTEXITCODE -ne 0) {
             throw "ISCC failed with exit code $LASTEXITCODE for runtime $runtime"
         }

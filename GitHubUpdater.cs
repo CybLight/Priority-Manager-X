@@ -111,7 +111,7 @@ namespace PriorityManagerX
             }
         }
 
-        public static async Task DownloadAssetAsync(string url, string targetFilePath, CancellationToken cancellationToken = default)
+        public static async Task DownloadAssetAsync(string url, string targetFilePath, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, url);
             using var response = await Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
@@ -121,9 +121,28 @@ namespace PriorityManagerX
             if (!string.IsNullOrWhiteSpace(targetDir))
                 Directory.CreateDirectory(targetDir);
 
+            var totalBytes = response.Content.Headers.ContentLength;
             await using var source = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             await using var destination = File.Create(targetFilePath);
-            await source.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+
+            var buffer = new byte[81920];
+            long bytesRead = 0;
+            int lastReportedPercent = -1;
+            int read;
+            while ((read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+                bytesRead += read;
+                if (totalBytes > 0 && progress != null)
+                {
+                    var percent = (int)(bytesRead * 100 / totalBytes.Value);
+                    if (percent != lastReportedPercent)
+                    {
+                        lastReportedPercent = percent;
+                        progress.Report(percent);
+                    }
+                }
+            }
         }
 
         static async Task<UpdateReleaseInfo?> GetReleaseAsync(AppSettings settings, CancellationToken cancellationToken)

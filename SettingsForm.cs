@@ -9,6 +9,9 @@ namespace PriorityManagerX
     public sealed class SettingsForm : Form
     {
         readonly ComboBox language = new();
+        readonly ComboBox themeCombo = new();
+        readonly Panel accentColorPreview = new();
+        readonly Panel gridAccentColorPreview = new();
         readonly CheckBox autoApply = new();
         readonly CheckBox confirmApply = new();
         readonly CheckBox autoRefresh = new();
@@ -69,7 +72,10 @@ namespace PriorityManagerX
                 CheckUpdatesOnStartup = settings.CheckUpdatesOnStartup,
                 IncludePrereleaseUpdates = settings.IncludePrereleaseUpdates,
                 UpdatePeriod = settings.UpdatePeriod,
-                LastUpdateCheckUtc = settings.LastUpdateCheckUtc
+                LastUpdateCheckUtc = settings.LastUpdateCheckUtc,
+                Theme = settings.Theme,
+                AccentColor = settings.AccentColor,
+                GridAccentColor = settings.GridAccentColor
             };
 
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -122,11 +128,21 @@ namespace PriorityManagerX
 
         Control BuildInterfacePage(AppSettings settings)
         {
-            var group = NewGroup(L10n.SettingsInterface);
-            group.Dock = DockStyle.Top;
+            var panel = new FlowLayoutPanel
+            {
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Dock = DockStyle.Top,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink
+            };
 
-            var grid = NewGrid(2);
-            grid.Dock = DockStyle.Top;
+            // Language group
+            var langGroup = NewGroup(L10n.SettingsInterface);
+            langGroup.Dock = DockStyle.Top;
+
+            var langGrid = NewGrid(2);
+            langGrid.Dock = DockStyle.Top;
 
             var languageLabel = new Label
             {
@@ -152,11 +168,102 @@ namespace PriorityManagerX
                 _ => 0
             };
 
-            grid.Controls.Add(languageLabel, 0, 0);
-            grid.Controls.Add(language, 1, 0);
-            group.Controls.Add(grid);
+            langGrid.Controls.Add(languageLabel, 0, 0);
+            langGrid.Controls.Add(language, 1, 0);
+            langGroup.Controls.Add(langGrid);
 
-            return group;
+            // Appearance group
+            var themeGroup = NewGroup(L10n.ThemeGroup);
+            themeGroup.Dock = DockStyle.Top;
+
+            var themeGrid = NewGrid(3);
+            themeGrid.Dock = DockStyle.Top;
+
+            var themeLabel = new Label
+            {
+                Text = L10n.ThemeLabel,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 8, 8, 8)
+            };
+
+            themeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+            themeCombo.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+            themeCombo.Width = 200;
+            themeCombo.Items.AddRange(new object[] { L10n.ThemeLight, L10n.ThemeDark, L10n.ThemeSystem });
+            themeCombo.SelectedIndex = settings.Theme switch
+            {
+                AppTheme.Dark => 1,
+                AppTheme.System => 2,
+                _ => 0
+            };
+
+            themeGrid.Controls.Add(themeLabel, 0, 0);
+            themeGrid.Controls.Add(themeCombo, 1, 0);
+            themeGrid.SetColumnSpan(themeCombo, 2);
+
+            // Accent color
+            var accentLabel = new Label
+            {
+                Text = L10n.AccentColorLabel,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 8, 8, 8)
+            };
+
+            accentColorPreview.Size = new Size(36, 22);
+            accentColorPreview.BorderStyle = BorderStyle.FixedSingle;
+            accentColorPreview.Anchor = AnchorStyles.Left;
+            accentColorPreview.Margin = new Padding(0, 6, 4, 6);
+            accentColorPreview.BackColor = ParseHexColor(settings.AccentColor, System.Drawing.Color.FromArgb(48, 120, 210));
+            accentColorPreview.Cursor = Cursors.Hand;
+
+            var accentButton = new Button
+            {
+                Text = L10n.ChooseColorBtn,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left
+            };
+            accentButton.Click += (_, _) => PickColor(accentColorPreview);
+
+            themeGrid.Controls.Add(accentLabel, 0, 1);
+            themeGrid.Controls.Add(accentColorPreview, 1, 1);
+            themeGrid.Controls.Add(accentButton, 2, 1);
+
+            // Grid row accent color
+            var gridAccentLabel = new Label
+            {
+                Text = L10n.GridAccentColorLabel,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 8, 8, 8)
+            };
+
+            gridAccentColorPreview.Size = new Size(36, 22);
+            gridAccentColorPreview.BorderStyle = BorderStyle.FixedSingle;
+            gridAccentColorPreview.Anchor = AnchorStyles.Left;
+            gridAccentColorPreview.Margin = new Padding(0, 6, 4, 6);
+            gridAccentColorPreview.BackColor = ParseHexColor(settings.GridAccentColor, System.Drawing.Color.FromArgb(224, 246, 255));
+            gridAccentColorPreview.Cursor = Cursors.Hand;
+
+            var gridAccentButton = new Button
+            {
+                Text = L10n.ChooseColorBtn,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left
+            };
+            gridAccentButton.Click += (_, _) => PickColor(gridAccentColorPreview);
+
+            themeGrid.Controls.Add(gridAccentLabel, 0, 2);
+            themeGrid.Controls.Add(gridAccentColorPreview, 1, 2);
+            themeGrid.Controls.Add(gridAccentButton, 2, 2);
+
+            themeGroup.Controls.Add(themeGrid);
+
+            panel.Controls.Add(langGroup);
+            panel.Controls.Add(themeGroup);
+
+            return panel;
         }
 
         Control BuildBehaviorPage(AppSettings settings)
@@ -504,6 +611,15 @@ namespace PriorityManagerX
             Settings.IncludePrereleaseUpdates = includePrereleaseUpdates.Checked;
 
             Settings.AutoStartWithWindows = Settings.GuiStartupMode != StartupScopeMode.Disabled;
+
+            Settings.Theme = themeCombo.SelectedIndex switch
+            {
+                1 => AppTheme.Dark,
+                2 => AppTheme.System,
+                _ => AppTheme.Light
+            };
+            Settings.AccentColor = ColorToHex(accentColorPreview.BackColor);
+            Settings.GridAccentColor = ColorToHex(gridAccentColorPreview.BackColor);
         }
 
         void UpdateSharedLocationEnabledState()
@@ -599,5 +715,33 @@ namespace PriorityManagerX
 
             public override string ToString() => Title;
         }
+
+        static void PickColor(Panel preview)
+        {
+            using var dlg = new ColorDialog
+            {
+                Color = preview.BackColor,
+                FullOpen = true
+            };
+            if (dlg.ShowDialog() == DialogResult.OK)
+                preview.BackColor = dlg.Color;
+        }
+
+        static System.Drawing.Color ParseHexColor(string hex, System.Drawing.Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(hex))
+                return fallback;
+
+            try
+            {
+                return ColorTranslator.FromHtml(hex);
+            }
+            catch
+            {
+                return fallback;
+            }
+        }
+
+        static string ColorToHex(System.Drawing.Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
     }
 }
